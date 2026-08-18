@@ -102,7 +102,10 @@ export default function AddMovieModal({ onClose, onCreated }) {
               value={year}
               onChange={(e) => setYear(e.target.value)}
               type="number"
-              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/60"
+              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/60
+                    [appearance:textfield]
+                    [&::-webkit-inner-spin-button]:appearance-none
+                    [&::-webkit-outer-spin-button]:appearance-none"
               placeholder="2014"
             />
           </div>
@@ -115,7 +118,10 @@ export default function AddMovieModal({ onClose, onCreated }) {
               min="0"
               max="10"
               step="0.1"
-              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/60"
+              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/60
+                    [appearance:textfield]
+                    [&::-webkit-inner-spin-button]:appearance-none
+                    [&::-webkit-outer-spin-button]:appearance-none"
               placeholder="—"
             />
           </div>

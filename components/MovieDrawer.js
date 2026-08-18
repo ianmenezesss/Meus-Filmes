@@ -190,7 +190,10 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
                   saveField({ my_rating: myRating === "" ? null : parseFloat(myRating) })
                 }
                 placeholder="—"
-                className="w-16 bg-transparent font-mono text-lg text-gold focus:outline-none border-b border-transparent focus:border-gold"
+                className="w-16 bg-transparent font-mono text-lg text-gold focus:outline-none border-b border-transparent focus:border-gold
+                    [appearance:textfield]
+                    [&::-webkit-inner-spin-button]:appearance-none
+                    [&::-webkit-outer-spin-button]:appearance-none"
               />
             </div>
           </div>
@@ -256,8 +259,8 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
                   }}
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                     status === s
-                      ? "bg-gold text-black border-gold"
-                      : "border-border text-gray-400 hover:border-gold/50"
+                      ? "bg-gold text-white border-gold"
+                      : "border-border text-gray-500 hover:border-gold/50"
                   }`}
                 >
                   {STATUS_LABELS[s]}
