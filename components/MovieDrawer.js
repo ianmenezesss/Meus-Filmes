@@ -3,30 +3,25 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { X, Star, RefreshCw, Trash2 } from "lucide-react";
-
-const STATUS_OPTIONS = ["Nao iniciada", "Em andamento", "Concluido", "Dropei"];
-const STATUS_LABELS = {
-  "Nao iniciada": "Não iniciada",
-  "Em andamento": "Em andamento",
-  Concluido: "Concluído",
-  Dropei: "Dropei",
-};
+import { STATUS, STATUS_LABELS, STATUS_ORDER } from "@/lib/status";
 
 export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
   const [myRating, setMyRating] = useState(movie.my_rating ?? "");
-  const [status, setStatus] = useState(movie.status ?? "Nao iniciada");
+  const [status, setStatus] = useState(movie.status ?? STATUS.NOT_STARTED);
   const [originalTitle, setOriginalTitle] = useState(movie.original_title ?? "");
   const [saving, setSaving] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [enrichNotice, setEnrichNotice] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [localMovie, setLocalMovie] = useState(movie);
 
   useEffect(() => {
     setLocalMovie(movie);
     setMyRating(movie.my_rating ?? "");
-    setStatus(movie.status ?? "Nao iniciada");
+    setStatus(movie.status ?? STATUS.NOT_STARTED);
     setOriginalTitle(movie.original_title ?? "");
     setConfirmingDelete(false);
+    setEnrichNotice(null);
   }, [movie]);
 
   async function saveField(patch) {
@@ -47,19 +42,22 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
 
   async function handleEnrich() {
     setEnriching(true);
+    setEnrichNotice(null);
     try {
       const trimmedOriginal = originalTitle.trim() || null;
       if (trimmedOriginal !== (localMovie.original_title || null)) {
         await saveField({ original_title: trimmedOriginal });
       }
       const res = await fetch(`/api/movies/${localMovie.id}/enrich`, { method: "POST" });
+      const data = await res.json();
       if (res.ok) {
-        const updated = await res.json();
-        setLocalMovie(updated);
-        onUpdated(updated);
+        setLocalMovie(data);
+        onUpdated(data);
+        if (data.matchedVia === "search") {
+          setEnrichNotice(`Encontrado por busca aproximada como "${data.matchedTitle}" — confira se é o filme certo.`);
+        }
       } else {
-        const err = await res.json();
-        alert(err.error || "Não foi possível buscar dados do IMDb.");
+        alert(data.error || "Não foi possível buscar dados do IMDb.");
       }
     } finally {
       setEnriching(false);
@@ -115,7 +113,6 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             ))}
           </div>
 
-          {/* Notas lado a lado */}
           <div className="grid grid-cols-2 gap-3 mt-5">
             <div className="bg-black/30 border border-border rounded-lg p-3">
               <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">Nota IMDb</p>
@@ -144,7 +141,6 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             </div>
           </div>
 
-          {/* Titulo original, pra buscar certo na OMDb quando o nome em portugues nao bate */}
           <div className="mt-4">
             <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
               Título original (em inglês, opcional)
@@ -158,7 +154,6 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             />
           </div>
 
-          {/* Botao pra buscar/rebuscar dados do IMDb - sempre disponivel */}
           <button
             onClick={handleEnrich}
             disabled={enriching}
@@ -171,17 +166,19 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
               ? "Buscar novamente no IMDb"
               : "Buscar pôster, sinopse e nota do IMDb"}
           </button>
-          {localMovie.imdb_id && (
+          {enrichNotice && (
+            <p className="text-[11px] text-amber-400 mt-1 text-center">{enrichNotice}</p>
+          )}
+          {localMovie.imdb_id && !enrichNotice && (
             <p className="text-[11px] text-gray-600 mt-1 text-center">
               Nota errada ou filme errado? Preencha o título original acima e busque de novo.
             </p>
           )}
 
-          {/* Status */}
           <div className="mt-5">
             <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1.5">Status</p>
             <div className="flex flex-wrap gap-1.5">
-              {STATUS_OPTIONS.map((s) => (
+              {STATUS_ORDER.map((s) => (
                 <button
                   key={s}
                   onClick={() => {
@@ -200,7 +197,6 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             </div>
           </div>
 
-          {/* Sinopse */}
           {localMovie.plot && (
             <div className="mt-5">
               <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1.5">Sinopse</p>

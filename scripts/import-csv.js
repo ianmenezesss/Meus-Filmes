@@ -1,14 +1,24 @@
 // Importa o CSV exportado do Notion pro banco de dados.
 // Uso: npm run db:import -- ./meus-filmes.csv
 //
-// Se os nomes das colunas do seu CSV forem diferentes, ajuste o objeto
-// COLUMN_MAP abaixo (chave = nome usado no codigo, valor = nome exato da coluna no CSV).
+// Só deve ser rodado manualmente (import inicial ou reimport controlado) —
+// NUNCA faz parte do build da Vercel. Cada linha vira um INSERT novo, então
+// rodar duas vezes com o mesmo CSV duplica os filmes; não faz upsert por
+// título porque o catálogo não tem um identificador estável e confiável
+// entre o Notion e o app (ver README para o fluxo recomendado).
+//
+// CORREÇÃO: a coluna "Título Original" (adicionada ao CSV pra melhorar a
+// busca no IMDb/OMDb) não estava mapeada aqui — o COLUMN_MAP nem sabia que
+// ela existia e o INSERT não tinha o campo original_title. Resultado: por
+// mais que o CSV estivesse com os títulos originais preenchidos, um
+// reimport NUNCA gravava esse dado no banco. Adicionado abaixo.
 
 require("dotenv").config({ path: ".env.local" });
 const fs = require("fs");
 const path = require("path");
 const { parse } = require("csv-parse/sync");
 const { Pool } = require("pg");
+const { normalizeStatus } = require("../lib/status");
 
 const COLUMN_MAP = {
   notionId: "ID",
@@ -22,6 +32,7 @@ const COLUMN_MAP = {
   addedAt: "Adicionado em",
   linkedMovies: "Filmes Ligados",
   runtime: "Minutagem",
+  originalTitle: "Título Original",
 };
 
 function parseBool(value) {
@@ -48,6 +59,12 @@ function parseIntSafe(value) {
   if (value === undefined || value === null || value === "") return null;
   const n = parseInt(value, 10);
   return Number.isNaN(n) ? null : n;
+}
+
+function parseOriginalTitle(value) {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  return trimmed || null;
 }
 
 async function main() {
@@ -91,13 +108,14 @@ async function main() {
     try {
       await pool.query(
         `INSERT INTO movies (
-          notion_id, title, status, genres, year, my_rating,
+          notion_id, title, original_title, status, genres, year, my_rating,
           upcoming, priority, linked_movies, runtime, added_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
         [
           parseIntSafe(row[COLUMN_MAP.notionId]),
           title.trim(),
-          row[COLUMN_MAP.status] || "Nao iniciada",
+          parseOriginalTitle(row[COLUMN_MAP.originalTitle]),
+          normalizeStatus(row[COLUMN_MAP.status]),
           parseGenres(row[COLUMN_MAP.genres]),
           parseIntSafe(row[COLUMN_MAP.year]),
           parseNumber(row[COLUMN_MAP.rating]),

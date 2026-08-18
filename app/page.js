@@ -6,12 +6,16 @@ import MovieGrid from "@/components/MovieGrid";
 import MovieDrawer from "@/components/MovieDrawer";
 import AddMovieModal from "@/components/AddMovieModal";
 import FilterBar from "@/components/FilterBar";
+import { filterAndSortMovies, SORT_OPTIONS } from "@/lib/movieQuery";
 
 export default function HomePage() {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [myRatingMin, setMyRatingMin] = useState(null);
+  const [imdbRatingMin, setImdbRatingMin] = useState(null);
+  const [sort, setSort] = useState(SORT_OPTIONS.DEFAULT);
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -30,13 +34,15 @@ export default function HomePage() {
     }
   }
 
-  const filtered = useMemo(() => {
-    return movies.filter((m) => {
-      const matchesStatus = !status || m.status === status;
-      const matchesSearch = !search || m.title.toLowerCase().includes(search.toLowerCase());
-      return matchesStatus && matchesSearch;
-    });
-  }, [movies, status, search]);
+  // Recalculado sempre que `movies` OU qualquer critério muda — é isso que
+  // garante que, depois de editar um filme (ex: status -> Concluído), ele
+  // aparece na posição correta imediatamente, sem precisar recarregar a
+  // página. Antes, a ordem de exibição ficava "congelada" na ordem do
+  // carregamento inicial porque nada recalculava a ordenação após um update.
+  const visibleMovies = useMemo(
+    () => filterAndSortMovies(movies, { status, search, myRatingMin, imdbRatingMin, sort }),
+    [movies, status, search, myRatingMin, imdbRatingMin, sort]
+  );
 
   function handleUpdated(updated) {
     setMovies((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
@@ -57,7 +63,7 @@ export default function HomePage() {
         <Film className="w-6 h-6 text-gold" />
         <h1 className="font-marquee text-3xl tracking-wide">Meus Filmes</h1>
         <span className="text-xs text-gray-500 font-mono ml-auto">
-          {movies.length} {movies.length === 1 ? "filme" : "filmes"}
+          {visibleMovies.length} de {movies.length} {movies.length === 1 ? "filme" : "filmes"}
         </span>
       </header>
 
@@ -66,13 +72,19 @@ export default function HomePage() {
         setSearch={setSearch}
         status={status}
         setStatus={setStatus}
+        myRatingMin={myRatingMin}
+        setMyRatingMin={setMyRatingMin}
+        imdbRatingMin={imdbRatingMin}
+        setImdbRatingMin={setImdbRatingMin}
+        sort={sort}
+        setSort={setSort}
         onAddClick={() => setShowAdd(true)}
       />
 
       {loading ? (
         <div className="text-center py-24 text-gray-500 font-mono text-sm">Carregando...</div>
       ) : (
-        <MovieGrid movies={filtered} onSelect={setSelected} />
+        <MovieGrid movies={visibleMovies} onSelect={setSelected} />
       )}
 
       {selected && (

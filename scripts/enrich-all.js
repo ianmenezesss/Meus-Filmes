@@ -1,41 +1,26 @@
-// Busca poster, sinopse e nota do IMDb (via OMDb) pra TODOS os filmes que
-// ainda nao tem esses dados, com um intervalo entre as chamadas pra respeitar
-// o limite gratuito da OMDb (1000 requisicoes/dia).
+// Busca poster, sinopse e nota do IMDb (via OMDb) pra filmes que ainda nao
+// tem esses dados (imdb_id IS NULL), usando o MESMO serviço de busca
+// (lib/omdb.js) que a rota /api/movies/[id]/enrich usa — não existe mais
+// lógica de busca duplicada entre o app e este script.
 //
-// Uso: npm run db:enrich
+// NÃO faz parte do build da Vercel (ver README) — rode manualmente quando
+// quiser, ou agende como Vercel Cron Job separado se preferir automação.
+// Filmes com imdb_id ainda NULL nunca são "esquecidos": simplesmente
+// aparecem de novo na próxima execução, então uma falha de rede/OMDb num
+// filme específico não exige nenhuma ação manual de "resetar" o registro.
+//
+// Uso: npm run db:enrich [-- --force]
+//   --force  também re-busca filmes que já têm imdb_id (útil depois de
+//            preencher/corrigir um original_title manualmente em lote)
 
 require("dotenv").config({ path: ".env.local" });
 const { Pool } = require("pg");
+const { fetchFromOMDb } = require("../lib/omdb");
 
-const DELAY_MS = 400; // ~2.5 chamadas/segundo, bem tranquilo pro limite gratuito
+const DELAY_MS = 400; // ~2.5 chamadas/segundo, tranquilo pro limite gratuito da OMDb
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchFromOMDb({ title, originalTitle, year }) {
-  const apiKey = process.env.OMDB_API_KEY;
-  if (!apiKey) throw new Error("OMDB_API_KEY nao configurada no .env.local");
-
-  const searchTitle = originalTitle && originalTitle.trim() ? originalTitle.trim() : title;
-
-  const params = new URLSearchParams({ apikey: apiKey, t: searchTitle, plot: "short" });
-  if (year) params.set("y", year);
-
-  const res = await fetch(`https://www.omdbapi.com/?${params.toString()}`);
-  const data = await res.json();
-
-  if (data.Response === "False") {
-    return { found: false, error: data.Error };
-  }
-
-  return {
-    found: true,
-    imdb_id: data.imdbID,
-    imdb_rating: data.imdbRating && data.imdbRating !== "N/A" ? parseFloat(data.imdbRating) : null,
-    poster_url: data.Poster && data.Poster !== "N/A" ? data.Poster : null,
-    plot: data.Plot && data.Plot !== "N/A" ? data.Plot : null,
-  };
 }
 
 async function main() {
@@ -57,10 +42,11 @@ async function main() {
       : `SELECT id, title, original_title, year FROM movies WHERE imdb_id IS NULL ORDER BY title ASC`
   );
 
-  console.log(`${movies.length} filmes sem dados do IMDb. Buscando...\n`);
+  console.log(`${movies.length} filme(s) para buscar no IMDb...\n`);
 
   let ok = 0;
   let fail = 0;
+  const failures = [];
 
   for (const movie of movies) {
     try {
@@ -70,24 +56,30 @@ async function main() {
         year: movie.year,
       });
       if (!data.found) {
-        console.log(`✗ ${movie.title} — nao encontrado (${data.error})`);
+        console.log(`✗ ${movie.title} — não encontrado (${data.error})`);
+        failures.push(movie.title);
         fail++;
       } else {
         await pool.query(
           `UPDATE movies SET imdb_id = $1, imdb_rating = $2, poster_url = $3, plot = $4, enriched_at = NOW() WHERE id = $5`,
           [data.imdb_id, data.imdb_rating, data.poster_url, data.plot, movie.id]
         );
-        console.log(`✓ ${movie.title} (${data.imdb_rating ?? "sem nota"})`);
+        const via = data.matchedVia === "search" ? " (via busca aproximada, confira)" : "";
+        console.log(`✓ ${movie.title} — ${data.imdb_rating ?? "sem nota"}${via}`);
         ok++;
       }
     } catch (err) {
       console.log(`✗ ${movie.title} — erro: ${err.message}`);
+      failures.push(movie.title);
       fail++;
     }
     await sleep(DELAY_MS);
   }
 
-  console.log(`\nConcluido: ${ok} atualizados, ${fail} nao encontrados/com erro.`);
+  console.log(`\nConcluído: ${ok} atualizados, ${fail} não encontrados/com erro.`);
+  if (failures.length) {
+    console.log(`Filmes que precisam de título original manual: ${failures.join(", ")}`);
+  }
   await pool.end();
   process.exit(0);
 }
