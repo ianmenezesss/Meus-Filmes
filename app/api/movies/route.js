@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMovies, createMovie } from "@/lib/db";
 
-// Sempre retorna a lista completa. Filtro/busca/ordenação acontecem no
-// frontend (lib/movieQuery.js) — não existe mais um segundo filtro feito
-// aqui via query string, pra não ter duas implementações de "o que é um
-// filme concluído" que podem divergir.
+
 export async function GET() {
   try {
     const movies = await getMovies();

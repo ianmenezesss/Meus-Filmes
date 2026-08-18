@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Film } from "lucide-react";
+import Link from "next/link";
+import { Film, LogOut } from "lucide-react";
 import MovieGrid from "@/components/MovieGrid";
 import MovieDrawer from "@/components/MovieDrawer";
 import AddMovieModal from "@/components/AddMovieModal";
@@ -13,14 +14,17 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [genre, setGenre] = useState(null);
   const [myRatingMin, setMyRatingMin] = useState(null);
   const [imdbRatingMin, setImdbRatingMin] = useState(null);
   const [sort, setSort] = useState(SORT_OPTIONS.DEFAULT);
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadMovies();
+    loadSession();
   }, []);
 
   async function loadMovies() {
@@ -34,14 +38,24 @@ export default function HomePage() {
     }
   }
 
-  // Recalculado sempre que `movies` OU qualquer critério muda — é isso que
-  // garante que, depois de editar um filme (ex: status -> Concluído), ele
-  // aparece na posição correta imediatamente, sem precisar recarregar a
-  // página. Antes, a ordem de exibição ficava "congelada" na ordem do
-  // carregamento inicial porque nada recalculava a ordenação após um update.
+  async function loadSession() {
+    try {
+      const res = await fetch("/api/auth/session");
+      const data = await res.json();
+      setIsAdmin(!!data.isAdmin);
+    } catch {
+      setIsAdmin(false);
+    }
+  }
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setIsAdmin(false);
+  }
+
   const visibleMovies = useMemo(
-    () => filterAndSortMovies(movies, { status, search, myRatingMin, imdbRatingMin, sort }),
-    [movies, status, search, myRatingMin, imdbRatingMin, sort]
+    () => filterAndSortMovies(movies, { status, genre, search, myRatingMin, imdbRatingMin, sort }),
+    [movies, status, genre, search, myRatingMin, imdbRatingMin, sort]
   );
 
   function handleUpdated(updated) {
@@ -65,6 +79,19 @@ export default function HomePage() {
         <span className="text-xs text-gray-500 font-mono ml-auto">
           {visibleMovies.length} de {movies.length} {movies.length === 1 ? "filme" : "filmes"}
         </span>
+        {isAdmin ? (
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 ml-3"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sair
+          </button>
+        ) : (
+          <Link href="/login" className="text-xs text-gray-500 hover:text-gray-300 ml-3">
+            Entrar
+          </Link>
+        )}
       </header>
 
       <FilterBar
@@ -72,6 +99,8 @@ export default function HomePage() {
         setSearch={setSearch}
         status={status}
         setStatus={setStatus}
+        genre={genre}
+        setGenre={setGenre}
         myRatingMin={myRatingMin}
         setMyRatingMin={setMyRatingMin}
         imdbRatingMin={imdbRatingMin}
@@ -79,6 +108,7 @@ export default function HomePage() {
         sort={sort}
         setSort={setSort}
         onAddClick={() => setShowAdd(true)}
+        isAdmin={isAdmin}
       />
 
       {loading ? (
@@ -90,13 +120,14 @@ export default function HomePage() {
       {selected && (
         <MovieDrawer
           movie={selected}
+          isAdmin={isAdmin}
           onClose={() => setSelected(null)}
           onUpdated={handleUpdated}
           onDeleted={handleDeleted}
         />
       )}
 
-      {showAdd && (
+      {isAdmin && showAdd && (
         <AddMovieModal onClose={() => setShowAdd(false)} onCreated={handleCreated} />
       )}
     </main>

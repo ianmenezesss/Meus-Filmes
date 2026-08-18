@@ -3,16 +3,22 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { STATUS, STATUS_LABELS, STATUS_ORDER } from "@/lib/status";
+import { GENRES } from "@/lib/genres";
 
 export default function AddMovieModal({ onClose, onCreated }) {
   const [title, setTitle] = useState("");
   const [originalTitle, setOriginalTitle] = useState("");
+  const [imdbId, setImdbId] = useState("");
   const [year, setYear] = useState("");
   const [status, setStatus] = useState(STATUS.NOT_STARTED);
   const [myRating, setMyRating] = useState("");
-  const [genres, setGenres] = useState("");
+  const [selectedGenres, setSelectedGenres] = useState([]);
   const [saving, setSaving] = useState(false);
   const [autoFetch, setAutoFetch] = useState(true);
+
+  function toggleGenre(g) {
+    setSelectedGenres((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -26,19 +32,16 @@ export default function AddMovieModal({ onClose, onCreated }) {
         body: JSON.stringify({
           title: title.trim(),
           original_title: originalTitle.trim() || null,
+          imdb_id: imdbId.trim() || null,
           year: year ? parseInt(year, 10) : null,
           status,
           my_rating: myRating === "" ? null : parseFloat(myRating),
-          genres: genres
-            .split(",")
-            .map((g) => g.trim())
-            .filter(Boolean),
+          genres: selectedGenres,
         }),
       });
       const movie = await res.json();
 
-      // busca automaticamente poster/sinopse/nota no IMDb pro filme novo
-      // (usa title + original_title, com fallback — ver lib/omdb.js)
+
       if (autoFetch) {
         try {
           const enrichRes = await fetch(`/api/movies/${movie.id}/enrich`, { method: "POST" });
@@ -49,7 +52,7 @@ export default function AddMovieModal({ onClose, onCreated }) {
             return;
           }
         } catch {
-          // se falhar, so segue com o filme sem enriquecer
+          
         }
       }
 
@@ -66,7 +69,7 @@ export default function AddMovieModal({ onClose, onCreated }) {
 
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-md bg-surface border border-border rounded-xl p-5"
+        className="relative w-full max-w-md bg-surface border border-border rounded-xl p-5 max-h-[90vh] overflow-y-auto"
       >
         <button
           type="button"
@@ -93,6 +96,14 @@ export default function AddMovieModal({ onClose, onCreated }) {
           onChange={(e) => setOriginalTitle(e.target.value)}
           className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:border-gold/60"
           placeholder="Ex: Interstellar"
+        />
+
+        <label className="block text-xs text-gray-400 mb-1">IMDb ID conhecido (opcional)</label>
+        <input
+          value={imdbId}
+          onChange={(e) => setImdbId(e.target.value)}
+          className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm mb-3 font-mono focus:outline-none focus:border-gold/60"
+          placeholder="Ex: tt0209144 — se preenchido, é usado direto (pula a busca por título)"
         />
 
         <div className="grid grid-cols-2 gap-3 mb-3">
@@ -127,13 +138,23 @@ export default function AddMovieModal({ onClose, onCreated }) {
           </div>
         </div>
 
-        <label className="block text-xs text-gray-400 mb-1">Gêneros (separados por vírgula)</label>
-        <input
-          value={genres}
-          onChange={(e) => setGenres(e.target.value)}
-          className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:border-gold/60"
-          placeholder="Ficção científica, Drama"
-        />
+        <label className="block text-xs text-gray-400 mb-1">Gêneros</label>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {GENRES.map((g) => (
+            <button
+              type="button"
+              key={g}
+              onClick={() => toggleGenre(g)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                selectedGenres.includes(g)
+                  ? "bg-gold text-white border-gold"
+                  : "border-border text-gray-400 hover:border-gold/50"
+              }`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
 
         <label className="block text-xs text-gray-400 mb-1">Status</label>
         <select

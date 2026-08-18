@@ -5,7 +5,7 @@ import Image from "next/image";
 import { X, Star, RefreshCw, Trash2 } from "lucide-react";
 import { STATUS, STATUS_LABELS, STATUS_ORDER } from "@/lib/status";
 
-export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
+export default function MovieDrawer({ movie, isAdmin, onClose, onUpdated, onDeleted }) {
   const [myRating, setMyRating] = useState(movie.my_rating ?? "");
   const [status, setStatus] = useState(movie.status ?? STATUS.NOT_STARTED);
   const [originalTitle, setOriginalTitle] = useState(movie.original_title ?? "");
@@ -17,28 +17,11 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [localMovie, setLocalMovie] = useState(movie);
 
-  // Sincroniza os dados "de exibição" (pôster, sinopse, nota IMDb, etc)
-  // toda vez que o filme muda — inclusive depois de um saveField() ou
-  // enrich, que retornam uma versão atualizada do filme.
   useEffect(() => {
     setLocalMovie(movie);
   }, [movie]);
 
-  // Reseta os campos EDITÁVEIS do formulário (nota, status, título
-  // original, IMDb ID) só quando o usuário troca de filme de fato
-  // (movie.id muda) — nunca quando o mesmo filme só teve um campo salvo.
-  //
-  // ANTES: esse reset rodava a cada mudança de `movie`, incluindo as que
-  // o próprio saveField() causava (salvar um campo -> onUpdated() no pai
-  // -> pai troca `selected` -> este componente recebe uma nova referência
-  // de `movie` -> reset dispara). Resultado: se você editasse o campo de
-  // IMDb ID e, antes do blur, qualquer outro salvamento acontecesse (ou
-  // mesmo o próprio blur, quando a validação de formato rejeitava o
-  // valor e portanto NUNCA chegava a salvar), o campo "voltava" para o
-  // valor antigo vindo do servidor — dando a impressão de estar sendo
-  // sobrescrito sozinho. O campo de título original não tinha esse
-  // sintoma na prática porque raramente havia um segundo salvamento
-  // acontecendo entre a digitação e o blur.
+
   useEffect(() => {
     setMyRating(movie.my_rating ?? "");
     setStatus(movie.status ?? STATUS.NOT_STARTED);
@@ -47,12 +30,8 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
     setImdbIdError(null);
     setConfirmingDelete(false);
     setEnrichNotice(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [movie.id]);
 
-  // Só usado para dar um AVISO (não bloquear) quando o valor digitado não
-  // parece um IMDb ID válido — o campo salva o que você digitar, do
-  // mesmo jeito que o campo de título original salva qualquer texto.
   const IMDB_ID_PATTERN = /^tt\d{7,8}$/i;
 
   function handleImdbIdBlur() {
@@ -100,11 +79,6 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
       if (res.ok) {
         setLocalMovie(data);
         onUpdated(data);
-        // Atualiza o campo de IMDb ID pra refletir o que foi encontrado —
-        // isso é intencional (o usuário vê o que o enrich achou), e é
-        // diferente do bug antigo: aqui é uma escrita explícita, não um
-        // reset acidental disparado por um useEffect toda vez que
-        // qualquer outro campo era salvo.
         setImdbIdInput(data.imdb_id ?? "");
         setImdbIdError(null);
         if (data.matchedVia === "search") {
@@ -179,94 +153,111 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             </div>
             <div className="bg-black/30 border border-gold/40 rounded-lg p-3">
               <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">Sua nota</p>
-              <input
-                type="number"
-                min="0"
-                max="10"
-                step="0.1"
-                value={myRating}
-                onChange={(e) => setMyRating(e.target.value)}
-                onBlur={() =>
-                  saveField({ my_rating: myRating === "" ? null : parseFloat(myRating) })
-                }
-                placeholder="—"
-                className="w-16 bg-transparent font-mono text-lg text-gold focus:outline-none border-b border-transparent focus:border-gold
+              {isAdmin ? (
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  value={myRating}
+                  onChange={(e) => setMyRating(e.target.value)}
+                  onBlur={() =>
+                    saveField({ my_rating: myRating === "" ? null : parseFloat(myRating) })
+                  }
+                  placeholder="—"
+                  className="w-16 bg-transparent font-mono text-lg text-gold focus:outline-none border-b border-transparent focus:border-gold
                     [appearance:textfield]
                     [&::-webkit-inner-spin-button]:appearance-none
                     [&::-webkit-outer-spin-button]:appearance-none"
-              />
+                />
+              ) : (
+                <span className="font-mono text-lg text-gold">
+                  {localMovie.my_rating != null ? localMovie.my_rating : "—"}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="mt-4">
-            <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
-              Título original (em inglês, opcional)
-            </p>
-            <input
-              value={originalTitle}
-              onChange={(e) => setOriginalTitle(e.target.value)}
-              onBlur={() => saveField({ original_title: originalTitle.trim() || null })}
-              placeholder={`Ex: Memento (deixe em branco se "${localMovie.title}" já é o nome em inglês)`}
-              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/60"
-            />
-          </div>
 
-          <div className="mt-3">
-            <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
-              IMDb ID conhecido (opcional)
-            </p>
-            <input
-              value={imdbIdInput}
-              onChange={(e) => setImdbIdInput(e.target.value)}
-              onBlur={handleImdbIdBlur}
-              placeholder="Ex: tt0209144 — se preenchido, é usado direto (pula a busca por título)"
-              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-gold/60"
-            />
-            {imdbIdError && <p className="text-[11px] text-amber-400 mt-1">{imdbIdError}</p>}
-          </div>
+          {isAdmin && (
+            <>
+              <div className="mt-4">
+                <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
+                  Título original (em inglês, opcional)
+                </p>
+                <input
+                  value={originalTitle}
+                  onChange={(e) => setOriginalTitle(e.target.value)}
+                  onBlur={() => saveField({ original_title: originalTitle.trim() || null })}
+                  placeholder={`Ex: Memento (deixe em branco se "${localMovie.title}" já é o nome em inglês)`}
+                  className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/60"
+                />
+              </div>
 
-          <button
-            onClick={handleEnrich}
-            disabled={enriching}
-            className="w-full mt-3 flex items-center justify-center gap-2 border border-border rounded-lg py-2 text-sm text-gray-300 hover:border-gold/50 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${enriching ? "animate-spin" : ""}`} />
-            {enriching
-              ? "Buscando no IMDb..."
-              : localMovie.imdb_id
-              ? "Buscar novamente no IMDb"
-              : "Buscar pôster, sinopse e nota do IMDb"}
-          </button>
-          {enrichNotice && (
-            <p className="text-[11px] text-amber-400 mt-1 text-center">{enrichNotice}</p>
-          )}
-          {localMovie.imdb_id && !enrichNotice && (
-            <p className="text-[11px] text-gray-600 mt-1 text-center">
-              Filme errado? Se você souber o ID certo, cole no campo acima — ele é usado direto.
-              Se não souber, apague o campo de ID e preencha o título original pra tentar de novo por título.
-            </p>
+              <div className="mt-3">
+                <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
+                  IMDb ID conhecido (opcional)
+                </p>
+                <input
+                  value={imdbIdInput}
+                  onChange={(e) => setImdbIdInput(e.target.value)}
+                  onBlur={handleImdbIdBlur}
+                  placeholder="Ex: tt0209144 — se preenchido, é usado direto (pula a busca por título)"
+                  className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-gold/60"
+                />
+                {imdbIdError && <p className="text-[11px] text-amber-400 mt-1">{imdbIdError}</p>}
+              </div>
+
+              <button
+                onClick={handleEnrich}
+                disabled={enriching}
+                className="w-full mt-3 flex items-center justify-center gap-2 border border-border rounded-lg py-2 text-sm text-gray-300 hover:border-gold/50 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${enriching ? "animate-spin" : ""}`} />
+                {enriching
+                  ? "Buscando no IMDb..."
+                  : localMovie.imdb_id
+                  ? "Buscar novamente no IMDb"
+                  : "Buscar pôster, sinopse e nota do IMDb"}
+              </button>
+              {enrichNotice && (
+                <p className="text-[11px] text-amber-400 mt-1 text-center">{enrichNotice}</p>
+              )}
+              {localMovie.imdb_id && !enrichNotice && (
+                <p className="text-[11px] text-gray-600 mt-1 text-center">
+                  Filme errado? Se você souber o ID certo, cole no campo acima — ele é usado direto.
+                  Se não souber, apague o campo de ID e preencha o título original pra tentar de novo por título.
+                </p>
+              )}
+            </>
           )}
 
           <div className="mt-5">
             <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1.5">Status</p>
-            <div className="flex flex-wrap gap-1.5">
-              {STATUS_ORDER.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setStatus(s);
-                    saveField({ status: s });
-                  }}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    status === s
-                      ? "bg-gold text-white border-gold"
-                      : "border-border text-gray-500 hover:border-gold/50"
-                  }`}
-                >
-                  {STATUS_LABELS[s]}
-                </button>
-              ))}
-            </div>
+            {isAdmin ? (
+              <div className="flex flex-wrap gap-1.5">
+                {STATUS_ORDER.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setStatus(s);
+                      saveField({ status: s });
+                    }}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      status === s
+                        ? "bg-gold text-white border-gold"
+                        : "border-border text-gray-500 hover:border-gold/50"
+                    }`}
+                  >
+                    {STATUS_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="text-xs px-2.5 py-1 rounded-full border bg-gold text-white border-gold">
+                {STATUS_LABELS[status]}
+              </span>
+            )}
           </div>
 
           {localMovie.plot && (
@@ -285,33 +276,37 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             </div>
           )}
 
-          {confirmingDelete ? (
-            <div className="mt-8 flex items-center gap-2">
-              <button
-                onClick={handleDelete}
-                className="flex-1 flex items-center justify-center gap-2 text-xs bg-red-500/10 border border-red-500/40 text-red-400 rounded-lg py-2 hover:bg-red-500/20"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Confirmar remoção
-              </button>
-              <button
-                onClick={() => setConfirmingDelete(false)}
-                className="flex-1 text-xs border border-border rounded-lg py-2 text-gray-400 hover:border-gray-500"
-              >
-                Cancelar
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleDelete}
-              className="w-full mt-8 flex items-center justify-center gap-2 text-xs text-red-400/70 hover:text-red-400 py-2"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Remover da lista
-            </button>
-          )}
+          {isAdmin && (
+            <>
+              {confirmingDelete ? (
+                <div className="mt-8 flex items-center gap-2">
+                  <button
+                    onClick={handleDelete}
+                    className="flex-1 flex items-center justify-center gap-2 text-xs bg-red-500/10 border border-red-500/40 text-red-400 rounded-lg py-2 hover:bg-red-500/20"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Confirmar remoção
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    className="flex-1 text-xs border border-border rounded-lg py-2 text-gray-400 hover:border-gray-500"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleDelete}
+                  className="w-full mt-8 flex items-center justify-center gap-2 text-xs text-red-400/70 hover:text-red-400 py-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Remover da lista
+                </button>
+              )}
 
-          {saving && <p className="text-[11px] text-gray-600 text-center mt-1">Salvando...</p>}
+              {saving && <p className="text-[11px] text-gray-600 text-center mt-1">Salvando...</p>}
+            </>
+          )}
         </div>
       </div>
     </div>

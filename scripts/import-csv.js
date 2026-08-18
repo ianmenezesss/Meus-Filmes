@@ -1,18 +1,3 @@
-// Importa o CSV exportado do Notion pro banco de dados.
-// Uso: npm run db:import -- ./meus-filmes.csv
-//
-// Só deve ser rodado manualmente (import inicial ou reimport controlado) —
-// NUNCA faz parte do build da Vercel. Cada linha vira um INSERT novo, então
-// rodar duas vezes com o mesmo CSV duplica os filmes; não faz upsert por
-// título porque o catálogo não tem um identificador estável e confiável
-// entre o Notion e o app (ver README para o fluxo recomendado).
-//
-// CORREÇÃO: a coluna "Título Original" (adicionada ao CSV pra melhorar a
-// busca no IMDb/OMDb) não estava mapeada aqui — o COLUMN_MAP nem sabia que
-// ela existia e o INSERT não tinha o campo original_title. Resultado: por
-// mais que o CSV estivesse com os títulos originais preenchidos, um
-// reimport NUNCA gravava esse dado no banco. Adicionado abaixo.
-
 require("dotenv").config({ path: ".env.local" });
 const fs = require("fs");
 const path = require("path");

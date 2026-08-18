@@ -1,6 +1,3 @@
-// Cria/atualiza o schema. Idempotente: pode rodar em todo deploy sem
-// destruir nada — só cria o que falta e normaliza status legados.
-// Uso: npm run db:init
 require("dotenv").config({ path: ".env.local" });
 const { Pool } = require("pg");
 const { STATUS, normalizeStatus } = require("../lib/status");
@@ -44,12 +41,7 @@ async function main() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_movies_status ON movies(status);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_movies_title ON movies(LOWER(title));`);
 
-  // --- Migração de status legados ---
-  // O CSV do Notion e telas antigas do app gravaram status como texto
-  // livre e não-padronizado ("Concluído", "Nao iniciada", etc). Aqui
-  // convertemos qualquer valor fora dos 4 códigos canônicos
-  // (NOT_STARTED/IN_PROGRESS/COMPLETED/DROPPED) para o código certo.
-  // Rodar isso de novo em linhas já migradas não faz nada (idempotente).
+
   const canonical = Object.values(STATUS);
   const { rows: nonCanonical } = await pool.query(
     `SELECT id, status FROM movies WHERE status IS NULL OR status != ALL($1::text[])`,

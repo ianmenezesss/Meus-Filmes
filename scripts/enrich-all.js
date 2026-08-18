@@ -1,23 +1,8 @@
-// Busca poster, sinopse e nota do IMDb (via OMDb) pra filmes que ainda nao
-// tem esses dados (imdb_id IS NULL), usando o MESMO serviço de busca
-// (lib/omdb.js) que a rota /api/movies/[id]/enrich usa — não existe mais
-// lógica de busca duplicada entre o app e este script.
-//
-// NÃO faz parte do build da Vercel (ver README) — rode manualmente quando
-// quiser, ou agende como Vercel Cron Job separado se preferir automação.
-// Filmes com imdb_id ainda NULL nunca são "esquecidos": simplesmente
-// aparecem de novo na próxima execução, então uma falha de rede/OMDb num
-// filme específico não exige nenhuma ação manual de "resetar" o registro.
-//
-// Uso: npm run db:enrich [-- --force]
-//   --force  também re-busca filmes que já têm imdb_id (útil depois de
-//            preencher/corrigir um original_title manualmente em lote)
-
 require("dotenv").config({ path: ".env.local" });
 const { Pool } = require("pg");
 const { fetchFromOMDb } = require("../lib/omdb");
 
-const DELAY_MS = 400; // ~2.5 chamadas/segundo, tranquilo pro limite gratuito da OMDb
+const DELAY_MS = 400; 
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -36,12 +21,7 @@ async function main() {
   const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
   const force = process.argv.includes("--force");
-  // Filtra por `enriched_at IS NULL`, não por `imdb_id IS NULL`. Antes os
-  // dois eram equivalentes, porque só o enrich escrevia em imdb_id. Agora
-  // que imdb_id também pode ser preenchido manualmente na gaveta do filme
-  // (como dado de entrada pro fallback por ID), um filme pode ter imdb_id
-  // preenchido e mesmo assim ainda não ter poster/sinopse/nota — ele
-  // precisa continuar aparecendo aqui até enriched_at ser gravado.
+
   const { rows: movies } = await pool.query(
     force
       ? `SELECT id, title, original_title, year, imdb_id FROM movies ORDER BY title ASC`

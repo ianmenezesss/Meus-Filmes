@@ -3,12 +3,15 @@
 import { Search, Plus } from "lucide-react";
 import { STATUS, STATUS_LABELS, STATUS_ORDER } from "@/lib/status";
 import { SORT_OPTIONS, SORT_LABELS } from "@/lib/movieQuery";
+import { GENRES } from "@/lib/genres";
 
 export default function FilterBar({
   search,
   setSearch,
   status,
   setStatus,
+  genre,
+  setGenre,
   myRatingMin,
   setMyRatingMin,
   imdbRatingMin,
@@ -16,6 +19,7 @@ export default function FilterBar({
   sort,
   setSort,
   onAddClick,
+  isAdmin,
 }) {
   return (
     <div className="flex flex-col gap-3 mb-6">
@@ -56,13 +60,15 @@ export default function FilterBar({
               className="bg-surface border border-border rounded-lg pl-9 pr-3 py-2 text-sm w-full sm:w-56 focus:outline-none focus:border-gold/60"
             />
           </div>
-          <button
-            onClick={onAddClick}
-            className="flex items-center gap-1.5 bg-gold text-white rounded-lg px-3 py-2 text-sm font-semibold hover:brightness-110 transition"
-          >
-            <Plus className="w-4 h-4" />
-            Adicionar
-          </button>
+          {isAdmin && (
+            <button
+              onClick={onAddClick}
+              className="flex items-center gap-1.5 bg-gold text-white rounded-lg px-3 py-2 text-sm font-semibold hover:brightness-110 transition"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar
+            </button>
+          )}
         </div>
       </div>
 
@@ -97,6 +103,20 @@ export default function FilterBar({
           </select>
         </label>
         */}
+
+        <label className="flex items-center gap-1.5">
+          Gênero
+          <select
+            value={genre ?? ""}
+            onChange={(e) => setGenre(e.target.value || null)}
+            className="bg-surface border border-border rounded-md px-2 py-1 text-xs"
+          >
+            <option value="">Todos</option>
+            {GENRES.map((g) => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+        </label>
 
         <label className="flex items-center gap-1.5 ml-auto">
           Ordenar por

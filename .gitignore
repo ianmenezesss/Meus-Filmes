@@ -4,4 +4,4 @@ node_modules
 .env.local
 .vercel
 *.log
-.md
+explica.docx
