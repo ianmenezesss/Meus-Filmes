@@ -4,7 +4,11 @@ require("dotenv").config({ path: ".env.local" });
 const { Pool } = require("pg");
 
 async function main() {
-  const connectionString = process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING;
+  const connectionString =
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.DATABASE_URL ||
+    process.env.PRISMA_DATABASE_URL;
   if (!connectionString) {
     console.error("POSTGRES_URL nao encontrada. Preencha o .env.local (veja .env.example).");
     process.exit(1);

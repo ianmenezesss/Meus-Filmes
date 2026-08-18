@@ -57,7 +57,11 @@ async function main() {
     process.exit(1);
   }
 
-  const connectionString = process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING;
+  const connectionString =
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.DATABASE_URL ||
+    process.env.PRISMA_DATABASE_URL;
   if (!connectionString) {
     console.error("POSTGRES_URL nao encontrada. Preencha o .env.local (veja .env.example).");
     process.exit(1);
@@ -69,6 +73,7 @@ async function main() {
     columns: true,
     skip_empty_lines: true,
     relax_column_count: true,
+    bom: true,
   });
 
   console.log(`Encontrados ${records.length} filmes no CSV. Colunas detectadas:`, Object.keys(records[0] || {}));
