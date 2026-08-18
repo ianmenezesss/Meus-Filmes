@@ -152,7 +152,7 @@ export default function AddMovieModal({ onClose, onCreated }) {
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-gold text-black font-semibold rounded-lg py-2.5 text-sm hover:brightness-110 disabled:opacity-50"
+          className="w-full bg-gold text-white font-semibold rounded-lg py-2.5 text-sm hover:brightness-110 disabled:opacity-50"
         >
           {saving ? "Salvando..." : "Adicionar filme"}
         </button>

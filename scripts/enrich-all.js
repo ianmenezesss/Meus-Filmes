@@ -36,10 +36,16 @@ async function main() {
   const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
   const force = process.argv.includes("--force");
+  // Filtra por `enriched_at IS NULL`, não por `imdb_id IS NULL`. Antes os
+  // dois eram equivalentes, porque só o enrich escrevia em imdb_id. Agora
+  // que imdb_id também pode ser preenchido manualmente na gaveta do filme
+  // (como dado de entrada pro fallback por ID), um filme pode ter imdb_id
+  // preenchido e mesmo assim ainda não ter poster/sinopse/nota — ele
+  // precisa continuar aparecendo aqui até enriched_at ser gravado.
   const { rows: movies } = await pool.query(
     force
-      ? `SELECT id, title, original_title, year FROM movies ORDER BY title ASC`
-      : `SELECT id, title, original_title, year FROM movies WHERE imdb_id IS NULL ORDER BY title ASC`
+      ? `SELECT id, title, original_title, year, imdb_id FROM movies ORDER BY title ASC`
+      : `SELECT id, title, original_title, year, imdb_id FROM movies WHERE enriched_at IS NULL ORDER BY title ASC`
   );
 
   console.log(`${movies.length} filme(s) para buscar no IMDb...\n`);
@@ -54,6 +60,7 @@ async function main() {
         title: movie.title,
         originalTitle: movie.original_title,
         year: movie.year,
+        imdbId: movie.imdb_id,
       });
       if (!data.found) {
         console.log(`✗ ${movie.title} — não encontrado (${data.error})`);
@@ -64,7 +71,12 @@ async function main() {
           `UPDATE movies SET imdb_id = $1, imdb_rating = $2, poster_url = $3, plot = $4, enriched_at = NOW() WHERE id = $5`,
           [data.imdb_id, data.imdb_rating, data.poster_url, data.plot, movie.id]
         );
-        const via = data.matchedVia === "search" ? " (via busca aproximada, confira)" : "";
+        const via =
+          data.matchedVia === "search"
+            ? " (via busca aproximada, confira)"
+            : data.matchedVia === "imdb_id"
+            ? " (via IMDb ID já conhecido, título não bateu)"
+            : "";
         console.log(`✓ ${movie.title} — ${data.imdb_rating ?? "sem nota"}${via}`);
         ok++;
       }

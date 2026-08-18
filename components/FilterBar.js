@@ -25,8 +25,8 @@ export default function FilterBar({
             onClick={() => setStatus("")}
             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
               !status
-                ? "bg-gold text-black border-gold"
-                : "bg-surface text-gray-300 border-border hover:border-gold/50"
+                ? "bg-gold text-white-900 border-gold"
+                : "bg-surface text-gray-500 border-border hover:border-gold/50"
             }`}
           >
             Todos
@@ -37,8 +37,8 @@ export default function FilterBar({
               onClick={() => setStatus(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                 status === s
-                  ? "bg-gold text-black border-gold"
-                  : "bg-surface text-gray-300 border-border hover:border-gold/50"
+                  ? "bg-gold text-white-900 border-gold"
+                  : "bg-surface text-gray-500 border-border hover:border-gold/50"
               }`}
             >
               {STATUS_LABELS[s]}
@@ -58,7 +58,7 @@ export default function FilterBar({
           </div>
           <button
             onClick={onAddClick}
-            className="flex items-center gap-1.5 bg-gold text-black rounded-lg px-3 py-2 text-sm font-semibold hover:brightness-110 transition"
+            className="flex items-center gap-1.5 bg-gold text-white rounded-lg px-3 py-2 text-sm font-semibold hover:brightness-110 transition"
           >
             <Plus className="w-4 h-4" />
             Adicionar
@@ -66,7 +66,9 @@ export default function FilterBar({
         </div>
       </div>
 
+
       <div className="flex flex-wrap gap-3 items-center text-xs text-gray-400">
+        {/*
         <label className="flex items-center gap-1.5">
           Minha nota ≥
           <select
@@ -94,6 +96,7 @@ export default function FilterBar({
             ))}
           </select>
         </label>
+        */}
 
         <label className="flex items-center gap-1.5 ml-auto">
           Ordenar por

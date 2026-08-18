@@ -2,13 +2,6 @@ import { NextResponse } from "next/server";
 import { getMovieById, saveEnrichment } from "@/lib/db";
 import { fetchFromOMDb } from "@/lib/omdb";
 
-// IMPORTANTE: no projeto original existiam DOIS arquivos route.js
-// diferentes para este mesmo caminho (app/api/movies/[id]/enrich/route.js)
-// — um passava original_title pra busca, o outro não. Como só um dos dois
-// pode fisicamente existir nesse caminho no repositório, qualquer que
-// fosse o "vencedor" já era parte do bug de busca (ignorando o título
-// original preenchido manualmente na gaveta do filme, por exemplo). Fique
-// com ESTE arquivo único.
 export async function POST(request, { params }) {
   try {
     const { id } = await params;
@@ -21,11 +14,12 @@ export async function POST(request, { params }) {
       title: movie.title,
       originalTitle: movie.original_title,
       year: movie.year,
+      imdbId: movie.imdb_id,
     });
 
     if (!omdbData.found) {
       return NextResponse.json(
-        { error: `Não encontrado na OMDb: ${omdbData.error}. Tente preencher o título original.` },
+        { error: `Não encontrado na OMDb: ${omdbData.error}. Tente preencher o título original ou o IMDb ID.` },
         { status: 404 }
       );
     }

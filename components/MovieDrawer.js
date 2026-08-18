@@ -9,20 +9,67 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
   const [myRating, setMyRating] = useState(movie.my_rating ?? "");
   const [status, setStatus] = useState(movie.status ?? STATUS.NOT_STARTED);
   const [originalTitle, setOriginalTitle] = useState(movie.original_title ?? "");
+  const [imdbIdInput, setImdbIdInput] = useState(movie.imdb_id ?? "");
+  const [imdbIdError, setImdbIdError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichNotice, setEnrichNotice] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [localMovie, setLocalMovie] = useState(movie);
 
+  // Sincroniza os dados "de exibição" (pôster, sinopse, nota IMDb, etc)
+  // toda vez que o filme muda — inclusive depois de um saveField() ou
+  // enrich, que retornam uma versão atualizada do filme.
   useEffect(() => {
     setLocalMovie(movie);
+  }, [movie]);
+
+  // Reseta os campos EDITÁVEIS do formulário (nota, status, título
+  // original, IMDb ID) só quando o usuário troca de filme de fato
+  // (movie.id muda) — nunca quando o mesmo filme só teve um campo salvo.
+  //
+  // ANTES: esse reset rodava a cada mudança de `movie`, incluindo as que
+  // o próprio saveField() causava (salvar um campo -> onUpdated() no pai
+  // -> pai troca `selected` -> este componente recebe uma nova referência
+  // de `movie` -> reset dispara). Resultado: se você editasse o campo de
+  // IMDb ID e, antes do blur, qualquer outro salvamento acontecesse (ou
+  // mesmo o próprio blur, quando a validação de formato rejeitava o
+  // valor e portanto NUNCA chegava a salvar), o campo "voltava" para o
+  // valor antigo vindo do servidor — dando a impressão de estar sendo
+  // sobrescrito sozinho. O campo de título original não tinha esse
+  // sintoma na prática porque raramente havia um segundo salvamento
+  // acontecendo entre a digitação e o blur.
+  useEffect(() => {
     setMyRating(movie.my_rating ?? "");
     setStatus(movie.status ?? STATUS.NOT_STARTED);
     setOriginalTitle(movie.original_title ?? "");
+    setImdbIdInput(movie.imdb_id ?? "");
+    setImdbIdError(null);
     setConfirmingDelete(false);
     setEnrichNotice(null);
-  }, [movie]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [movie.id]);
+
+  // Só usado para dar um AVISO (não bloquear) quando o valor digitado não
+  // parece um IMDb ID válido — o campo salva o que você digitar, do
+  // mesmo jeito que o campo de título original salva qualquer texto.
+  const IMDB_ID_PATTERN = /^tt\d{7,8}$/i;
+
+  function handleImdbIdBlur() {
+    const trimmed = imdbIdInput.trim();
+
+    if (trimmed && !IMDB_ID_PATTERN.test(trimmed)) {
+      setImdbIdError(
+        'Isso não parece o formato "tt" + números (ex: tt0209144), mas salvei do jeito que você digitou.'
+      );
+    } else {
+      setImdbIdError(null);
+    }
+
+    if (trimmed.toLowerCase() !== (localMovie.imdb_id || "")) {
+      saveField({ imdb_id: trimmed || null });
+    }
+  }
 
   async function saveField(patch) {
     setSaving(true);
@@ -53,6 +100,13 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
       if (res.ok) {
         setLocalMovie(data);
         onUpdated(data);
+        // Atualiza o campo de IMDb ID pra refletir o que foi encontrado —
+        // isso é intencional (o usuário vê o que o enrich achou), e é
+        // diferente do bug antigo: aqui é uma escrita explícita, não um
+        // reset acidental disparado por um useEffect toda vez que
+        // qualquer outro campo era salvo.
+        setImdbIdInput(data.imdb_id ?? "");
+        setImdbIdError(null);
         if (data.matchedVia === "search") {
           setEnrichNotice(`Encontrado por busca aproximada como "${data.matchedTitle}" — confira se é o filme certo.`);
         }
@@ -154,6 +208,20 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             />
           </div>
 
+          <div className="mt-3">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
+              IMDb ID conhecido (opcional)
+            </p>
+            <input
+              value={imdbIdInput}
+              onChange={(e) => setImdbIdInput(e.target.value)}
+              onBlur={handleImdbIdBlur}
+              placeholder="Ex: tt0209144 — se preenchido, é usado direto (pula a busca por título)"
+              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-gold/60"
+            />
+            {imdbIdError && <p className="text-[11px] text-amber-400 mt-1">{imdbIdError}</p>}
+          </div>
+
           <button
             onClick={handleEnrich}
             disabled={enriching}
@@ -171,7 +239,8 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
           )}
           {localMovie.imdb_id && !enrichNotice && (
             <p className="text-[11px] text-gray-600 mt-1 text-center">
-              Nota errada ou filme errado? Preencha o título original acima e busque de novo.
+              Filme errado? Se você souber o ID certo, cole no campo acima — ele é usado direto.
+              Se não souber, apague o campo de ID e preencha o título original pra tentar de novo por título.
             </p>
           )}
 
