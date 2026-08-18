@@ -15,14 +15,18 @@ const STATUS_LABELS = {
 export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
   const [myRating, setMyRating] = useState(movie.my_rating ?? "");
   const [status, setStatus] = useState(movie.status ?? "Nao iniciada");
+  const [originalTitle, setOriginalTitle] = useState(movie.original_title ?? "");
   const [saving, setSaving] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [localMovie, setLocalMovie] = useState(movie);
 
   useEffect(() => {
     setLocalMovie(movie);
     setMyRating(movie.my_rating ?? "");
     setStatus(movie.status ?? "Nao iniciada");
+    setOriginalTitle(movie.original_title ?? "");
+    setConfirmingDelete(false);
   }, [movie]);
 
   async function saveField(patch) {
@@ -44,6 +48,10 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
   async function handleEnrich() {
     setEnriching(true);
     try {
+      const trimmedOriginal = originalTitle.trim() || null;
+      if (trimmedOriginal !== (localMovie.original_title || null)) {
+        await saveField({ original_title: trimmedOriginal });
+      }
       const res = await fetch(`/api/movies/${localMovie.id}/enrich`, { method: "POST" });
       if (res.ok) {
         const updated = await res.json();
@@ -59,7 +67,10 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
   }
 
   async function handleDelete() {
-    if (!confirm(`Remover "${localMovie.title}" da sua lista?`)) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
     await fetch(`/api/movies/${localMovie.id}`, { method: "DELETE" });
     onDeleted(localMovie.id);
     onClose();
@@ -133,16 +144,37 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             </div>
           </div>
 
-          {/* Botao pra buscar dados do IMDb */}
-          {!localMovie.imdb_id && (
-            <button
-              onClick={handleEnrich}
-              disabled={enriching}
-              className="w-full mt-3 flex items-center justify-center gap-2 border border-border rounded-lg py-2 text-sm text-gray-300 hover:border-gold/50 disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${enriching ? "animate-spin" : ""}`} />
-              {enriching ? "Buscando no IMDb..." : "Buscar pôster, sinopse e nota do IMDb"}
-            </button>
+          {/* Titulo original, pra buscar certo na OMDb quando o nome em portugues nao bate */}
+          <div className="mt-4">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
+              Título original (em inglês, opcional)
+            </p>
+            <input
+              value={originalTitle}
+              onChange={(e) => setOriginalTitle(e.target.value)}
+              onBlur={() => saveField({ original_title: originalTitle.trim() || null })}
+              placeholder={`Ex: Memento (deixe em branco se "${localMovie.title}" já é o nome em inglês)`}
+              className="w-full bg-black/30 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gold/60"
+            />
+          </div>
+
+          {/* Botao pra buscar/rebuscar dados do IMDb - sempre disponivel */}
+          <button
+            onClick={handleEnrich}
+            disabled={enriching}
+            className="w-full mt-3 flex items-center justify-center gap-2 border border-border rounded-lg py-2 text-sm text-gray-300 hover:border-gold/50 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${enriching ? "animate-spin" : ""}`} />
+            {enriching
+              ? "Buscando no IMDb..."
+              : localMovie.imdb_id
+              ? "Buscar novamente no IMDb"
+              : "Buscar pôster, sinopse e nota do IMDb"}
+          </button>
+          {localMovie.imdb_id && (
+            <p className="text-[11px] text-gray-600 mt-1 text-center">
+              Nota errada ou filme errado? Preencha o título original acima e busque de novo.
+            </p>
           )}
 
           {/* Status */}
@@ -185,13 +217,31 @@ export default function MovieDrawer({ movie, onClose, onUpdated, onDeleted }) {
             </div>
           )}
 
-          <button
-            onClick={handleDelete}
-            className="w-full mt-8 flex items-center justify-center gap-2 text-xs text-red-400/70 hover:text-red-400 py-2"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Remover da lista
-          </button>
+          {confirmingDelete ? (
+            <div className="mt-8 flex items-center gap-2">
+              <button
+                onClick={handleDelete}
+                className="flex-1 flex items-center justify-center gap-2 text-xs bg-red-500/10 border border-red-500/40 text-red-400 rounded-lg py-2 hover:bg-red-500/20"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Confirmar remoção
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="flex-1 text-xs border border-border rounded-lg py-2 text-gray-400 hover:border-gray-500"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleDelete}
+              className="w-full mt-8 flex items-center justify-center gap-2 text-xs text-red-400/70 hover:text-red-400 py-2"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Remover da lista
+            </button>
+          )}
 
           {saving && <p className="text-[11px] text-gray-600 text-center mt-1">Salvando...</p>}
         </div>

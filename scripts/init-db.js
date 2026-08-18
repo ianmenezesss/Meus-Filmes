@@ -38,6 +38,11 @@ async function main() {
     );
   `);
 
+  // Titulo original (em ingles), usado pra buscar na OMDb com mais precisao
+  // quando o nome em portugues nao bate com o titulo do IMDb.
+  // ADD COLUMN IF NOT EXISTS e seguro rodar de novo numa tabela que ja existe.
+  await pool.query(`ALTER TABLE movies ADD COLUMN IF NOT EXISTS original_title TEXT;`);
+
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_movies_status ON movies(status);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_movies_title ON movies(LOWER(title));`);
 

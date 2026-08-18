@@ -13,11 +13,13 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchFromOMDb({ title, year }) {
+async function fetchFromOMDb({ title, originalTitle, year }) {
   const apiKey = process.env.OMDB_API_KEY;
   if (!apiKey) throw new Error("OMDB_API_KEY nao configurada no .env.local");
 
-  const params = new URLSearchParams({ apikey: apiKey, t: title, plot: "short" });
+  const searchTitle = originalTitle && originalTitle.trim() ? originalTitle.trim() : title;
+
+  const params = new URLSearchParams({ apikey: apiKey, t: searchTitle, plot: "short" });
   if (year) params.set("y", year);
 
   const res = await fetch(`https://www.omdbapi.com/?${params.toString()}`);
@@ -48,8 +50,11 @@ async function main() {
   }
   const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
 
+  const force = process.argv.includes("--force");
   const { rows: movies } = await pool.query(
-    `SELECT id, title, year FROM movies WHERE imdb_id IS NULL ORDER BY title ASC`
+    force
+      ? `SELECT id, title, original_title, year FROM movies ORDER BY title ASC`
+      : `SELECT id, title, original_title, year FROM movies WHERE imdb_id IS NULL ORDER BY title ASC`
   );
 
   console.log(`${movies.length} filmes sem dados do IMDb. Buscando...\n`);
@@ -59,7 +64,11 @@ async function main() {
 
   for (const movie of movies) {
     try {
-      const data = await fetchFromOMDb({ title: movie.title, year: movie.year });
+      const data = await fetchFromOMDb({
+        title: movie.title,
+        originalTitle: movie.original_title,
+        year: movie.year,
+      });
       if (!data.found) {
         console.log(`✗ ${movie.title} — nao encontrado (${data.error})`);
         fail++;
